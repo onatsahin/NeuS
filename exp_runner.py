@@ -341,6 +341,69 @@ class Runner:
 
         logging.info('End')
 
+    def validate_color_mesh(self, world_space=False, resolution=64, threshold=0.0):
+        bound_min = torch.tensor(self.dataset.object_bbox_min, dtype=torch.float32)
+        bound_max = torch.tensor(self.dataset.object_bbox_max, dtype=torch.float32)
+
+        vertices, triangles =\
+            self.renderer.extract_geometry(bound_min, bound_max, resolution=resolution, threshold=threshold)
+        os.makedirs(os.path.join(self.base_exp_dir, 'meshes'), exist_ok=True)
+
+        mesh = trimesh.Trimesh(vertices, triangles)
+
+        mesh_open3d = mesh.as_open3d
+        mesh_open3d.compute_vertex_normals()
+        vertices_open3d = torch.FloatTensor(mesh_open3d.vertices).to(self.device)
+
+        rays_d = torch.FloatTensor(-1 * np.asarray(mesh_open3d.vertex_normals)).to(self.device)
+        near_bound = bound_min[0] * torch.ones_like(rays_d[:, :1])
+        far_bound = bound_max[0] * torch.ones_like(rays_d[:, :1])
+        rays_o = vertices_open3d - rays_d * 0.5 * torch.abs(near_bound)
+
+        rays_o = rays_o.reshape(-1, 3).split(self.batch_size)
+        rays_d = rays_d.reshape(-1, 3).split(self.batch_size)
+
+        out_rgb_fine = []
+        out_normal_fine = []
+
+        for rays_o_batch, rays_d_batch in zip(rays_o, rays_d): 
+            background_rgb = None
+
+            near_batch, far_batch = self.dataset.near_far_from_sphere(rays_o_batch, rays_d_batch)
+
+            render_out = self.renderer.render(rays_o_batch,
+                                              rays_d_batch,
+                                              near_batch,
+                                              far_batch,
+                                              cos_anneal_ratio=self.get_cos_anneal_ratio(),
+                                              background_rgb=background_rgb)
+            
+
+            def feasible(key): return (key in render_out) and (render_out[key] is not None)
+
+            if feasible('color_fine'):
+                out_rgb_fine.append(render_out['color_fine'].detach().cpu().numpy())
+            if feasible('gradients') and feasible('weights'):
+                n_samples = self.renderer.n_samples + self.renderer.n_importance
+                normals = render_out['gradients'] * render_out['weights'][:, :n_samples, None]
+                if feasible('inside_sphere'):
+                    normals = normals * render_out['inside_sphere'][..., None]
+                normals = normals.sum(dim=1).detach().cpu().numpy()
+                out_normal_fine.append(normals)
+            
+            del render_out
+
+        if world_space:
+            vertices = vertices * self.dataset.scale_mats_np[0][0, 0] + self.dataset.scale_mats_np[0][:3, 3][None]
+
+        vertex_colors = (np.concatenate(out_rgb_fine, axis=0) * 256).clip(0, 255).astype(np.uint8)
+        vertex_colors[:, [2, 0]] = vertex_colors[:, [0, 2]] #RGB to BGR, or vice-versa
+        mesh.visual.vertex_colors = vertex_colors
+        
+        mesh.export(os.path.join(self.base_exp_dir, 'meshes', '{:0>8d}_color.ply'.format(self.iter_step)))
+
+        logging.info('End')
+
     def interpolate_view(self, img_idx_0, img_idx_1):
         images = []
         n_frames = 60
@@ -392,6 +455,8 @@ if __name__ == '__main__':
         runner.train()
     elif args.mode == 'validate_mesh':
         runner.validate_mesh(world_space=True, resolution=512, threshold=args.mcube_threshold)
+    elif args.mode == 'validate_color_mesh':
+        runner.validate_color_mesh(world_space=True, resolution=512, threshold=args.mcube_threshold)
     elif args.mode.startswith('interpolate'):  # Interpolate views given two image indices
         _, img_idx_0, img_idx_1 = args.mode.split('_')
         img_idx_0 = int(img_idx_0)
