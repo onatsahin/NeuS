@@ -1,4 +1,7 @@
 # NeuS
+
+## Note: Check the "validate_color_mesh" branch for extracting colored meshes.
+
 We present a novel neural surface reconstruction method, called NeuS (pronunciation: /nuːz/, same as "news"), for reconstructing objects and scenes with high fidelity from 2D image inputs.
 
 ![](./static/intro_1_compressed.gif)
