@@ -1,4 +1,4 @@
-# NeuS
+# NeuS-Color
 We present a novel neural surface reconstruction method, called NeuS (pronunciation: /nuːz/, same as "news"), for reconstructing objects and scenes with high fidelity from 2D image inputs.
 
 ![](./static/intro_1_compressed.gif)
@@ -73,6 +73,14 @@ python exp_runner.py --mode validate_mesh --conf <config_file> --case <case_name
 ```
 
 The corresponding mesh can be found in `exp/<case_name>/<exp_name>/meshes/<iter_steps>.ply`.
+
+- **Extract colored surface from trained model. Colors are obtained for each mesh vertex by using corresponding surface normals as view directions.** 
+
+```shell
+python exp_runner.py --mode validate_color_mesh --conf <config_file> --case <case_name> --is_continue # use latest checkpoint
+```
+
+The corresponding mesh can be found in `exp/<case_name>/<exp_name>/meshes/<iter_steps>_color.ply`.
 
 - **View interpolation**
 
