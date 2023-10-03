@@ -1,6 +1,7 @@
 # NeuS
 
-## Note: Check the "validate_color_mesh" branch for extracting colored meshes.
+## :red_circle: Note: Check the "validate_color_mesh" branch for extracting colored meshes.
+### :red_circle: This is a fork of the official NeuS repository. The main branch is the unedited original repository, while "validate_color_mesh" branch includes a custom implementation that enables extraction of a colored mesh.
 
 We present a novel neural surface reconstruction method, called NeuS (pronunciation: /nuːz/, same as "news"), for reconstructing objects and scenes with high fidelity from 2D image inputs.
 
